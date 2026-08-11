@@ -50,21 +50,23 @@ MEASURED_COLOR = "#B0413E"                    # brick red — distinct from AG n
 # Each bar: (label, colour, hatch, reference file, nested path above per_condition).
 # In (b), addition and ablation share the model colour and differ only by hatch, and are
 # kept adjacent within each model so they are easy to compare.
+# (letter, title, n_samples, bars). Design (c) uses the by-objective eval: each
+# condition scored only on the sequences evolved for it (on-target).
 PANELS = [
-    ("a", "Held-out test", [
+    ("a", "Held-out test", 33300, [
         ("AG (Probing)",     AG_LIGHT, None, "test_probing.json",   ()),
         ("AG (Fine-tuned)",  AG_DARK,  None, "test_finetuned.json", ()),
         ("plantGREP",        PG_DARK,  None, "pgrep_test.json",      ()),
     ]),
-    ("b", "Zero-shot perturbation", [
+    ("b", "Zero-shot perturbation", 22791, [
         ("AG · TF addition",        AG_DARK, None, "category_eval.json", ("perturbation", "insertion")),
         ("plantGREP · TF addition", PG_DARK, None, "pgrep_category.json", ("perturbation", "insertion")),
         ("AG · TF ablation",        AG_DARK, "///", "category_eval.json", ("perturbation", "shuffling")),
         ("plantGREP · TF ablation", PG_DARK, "///", "pgrep_category.json", ("perturbation", "shuffling")),
     ]),
-    ("c", "Zero-shot design", [
-        ("AG (Fine-tuned)", AG_DARK, None, "evolution_only.json", ()),
-        ("plantGREP",       PG_DARK, None, "pgrep_evolution.json", ()),
+    ("c", "Zero-shot design", 9665, [
+        ("AG (Fine-tuned)", AG_DARK, None, "evolution_by_objective.json", ()),
+        ("plantGREP",       PG_DARK, None, "pgrep_evolution_by_objective.json", ()),
     ]),
 ]
 
@@ -110,19 +112,21 @@ def _species_axis(ax):
                 va="top", fontsize=fs)
 
 
-def _draw_bar_panel(ax, letter, title, bars_spec):
+def _draw_bar_panel(ax, letter, title, n_samples, bars_spec):
     x = np.arange(len(CONDITIONS))
-    n = len(bars_spec)
-    width = min(0.26, 0.72 / n)
+    n_bars = len(bars_spec)
+    width = min(0.26, 0.72 / n_bars)
     for i, (label, color, hatch, fname, nested) in enumerate(bars_spec):
         vals = _per_condition(fname, nested)
-        offset = (i - n / 2) * width + width / 2
+        offset = (i - n_bars / 2) * width + width / 2
         bars = ax.bar(x + offset, vals, width, label=label, color=color,
                       alpha=0.9, edgecolor="black", linewidth=1, hatch=hatch)
         _label_bars(ax, bars, vals, color)
     ax.set_title(title, fontsize=TITLE_FS)
     ax.text(-0.02, 1.04, letter, transform=ax.transAxes, fontsize=LETTER_FS,
             fontweight="bold", va="bottom", ha="right")
+    ax.text(0.98, 0.97, f"n = {n_samples:,}", transform=ax.transAxes, fontsize=TICK_FS,
+            va="top", ha="right", color="#555555")
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.set_xticks(x)
@@ -133,7 +137,8 @@ def _draw_bar_panel(ax, letter, title, bars_spec):
     ax.set_axisbelow(True)
     _species_axis(ax)
     ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.20), frameon=False,
-              fontsize=LEGEND_FS, ncol=1 if n <= 2 else 2, columnspacing=1.0, handlelength=1.3)
+              fontsize=LEGEND_FS, ncol=1 if n_bars <= 2 else 2, columnspacing=1.0,
+              handlelength=1.3)
 
 
 def _draw_trajectory(ax, rows, title, letter=None, show_xlabel=True, show_legend=True):
