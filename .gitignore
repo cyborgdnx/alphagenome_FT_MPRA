@@ -222,3 +222,4 @@ out/*
 # SLURM job logs (.out/.err, not matched by *.log)
 logs/
 logs/*
+.venv-jores/
