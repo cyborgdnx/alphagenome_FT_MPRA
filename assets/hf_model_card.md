@@ -26,6 +26,7 @@ Four benchmarks, in both JAX (Haiku) and PyTorch where available:
 - **lentiMPRA** (Gosai et al.) — K562, HepG2, SKNSH
 - **Drosophila STARR-seq** (DeepSTARR; de Almeida et al.) — developmental + housekeeping
 - **Plant STARR-seq** (Jores et al. 2021) — tobacco leaf and maize protoplast, 3 data modes
+- **Plant multi-condition MPRA** (Jores et al. 2026) — 5 conditions (cold/dark/light/warm/maize)
 
 Code: [Al-Murphy/alphagenome_FT_MPRA](https://github.com/Al-Murphy/alphagenome_FT_MPRA)
 
@@ -77,8 +78,14 @@ for the manual path and the gotchas.
 | `mpra_HepG2` | lentiMPRA HepG2 | 0.8688 | **0.8876** |
 | `mpra_WTC11` | lentiMPRA WTC11 | 0.8278 | **0.8344** |
 | `starrseq_drosophila` | DeepSTARR (dev + hk) | 0.6184 | **0.7468** |
+| `jores_multicondition` | Jores 2026 plant MPRA (5 cond.) | — | **0.841** |
 
 Drosophila is the mean of the two tasks (fine-tuned: dev 0.7193, hk 0.7744).
+`jores_multicondition` is the mean across 5 conditions (cold 0.822, dark 0.887,
+light 0.873, warm 0.853, maize 0.770). **It loads with a different package** —
+the [`alphagenome-ft-jores26`](https://github.com/katelynsyc/alphagenome-ft-jores26)
+fork (`AlphaGenomeEncoderModel`), not `alphagenome-encoder-ft`; the two share an import
+name and can't be installed together. See the repo docs.
 
 ### `jax/` — plant STARR-seq (Jores 2021), test Pearson r
 

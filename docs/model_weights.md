@@ -78,8 +78,14 @@ model = load_pretrained('plant-starrseq-leaf-combined',
 | `mpra_HepG2` | lentiMPRA HepG2 | 0.8688 | **0.8876** |
 | `mpra_WTC11` | lentiMPRA WTC11 | 0.8278 | **0.8344** |
 | `starrseq_drosophila` | DeepSTARR (dev + hk) | 0.6184 | **0.7468** |
+| `jores_multicondition` | Jores 2026 plant MPRA (5 cond.) | — | **0.841** |
 
 Drosophila `test_pearson` is the mean of the two tasks (fine-tuned: dev 0.7193, hk 0.7744).
+
+`jores_multicondition` predicts 5 plant conditions (cold/dark/light/warm/maize) from a
+raw 170 bp core promoter; `test_pearson` 0.841 is the mean across conditions (per-cond in
+`finetuned_encoder.summary.json`: cold 0.822, dark 0.887, light 0.873, warm 0.853,
+maize 0.770). **It loads with a different package** — see the gotcha below.
 
 ### JAX (`jax/`)
 
@@ -144,6 +150,25 @@ cannot load them. Use `PlantMPRAHead` (what `load_pretrained` does).
 `load_checkpoint()` builds the head from the *registered* `HeadConfig`, **not** from the
 checkpoint's `config.json`. So the metadata must be registered before calling it or the
 restore dies on a shape mismatch. Again, `load_pretrained` handles this.
+
+**`jores_multicondition` loads with a DIFFERENT package.** The other torch checkpoints
+use [`alphagenome-encoder-ft`](https://github.com/MasayukiNagai/alphagenome-encoder-ft)
+(class `EncoderMPRAModel`, head registry `{mpra, deepstarr}`). This one uses the
+[`alphagenome-ft-jores26`](https://github.com/katelynsyc/alphagenome-ft-jores26) fork
+(class `AlphaGenomeEncoderModel`, registry `{mpra, joresmpra}`). Both use the import
+name `alphagenome_encoder_ft`, so **they cannot be installed together** — load this one
+from its own environment:
+
+```python
+# in an env with alphagenome-ft-jores26 installed
+from alphagenome_encoder_ft import AlphaGenomeEncoderModel
+model = AlphaGenomeEncoderModel.from_checkpoint(".../jores_multicondition/finetuned_encoder.pt")
+preds = model.predict_sequences(["ACGT..."])   # raw 170bp core promoter, no adapters
+# preds[:, i] -> [cold, dark, light, warm, maize][i]
+```
+
+`hub.load_pretrained('jores_multicondition')` does this for you and raises a clear
+message if the wrong fork is installed.
 
 **Gosai head is `GosaiMPRAHead`, not `EncoderMPRAHead`.** Same module names, but it uses
 `hk.LayerNorm` (not `alphagenome_research`'s `layers.LayerNorm`) and hard-codes the
