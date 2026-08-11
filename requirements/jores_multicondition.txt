@@ -1,0 +1,38 @@
+# Requirements for the Jores 2026 plant multi-condition MPRA pipeline
+#   scripts/finetune_jores_multicondition.py   (training)
+#   scripts/test_jores_multicondition.py        (held-out + by-objective + categories)
+#   scripts/perturbation_jores_multicondition.py (zero-shot saturation mutagenesis)
+#   scripts/design_jores_multicondition.py       (zero-shot in-silico evolution)
+#
+# This is the PyTorch AlphaGenome-encoder path (backbone from alphagenome-pytorch), so
+# it does NOT share the repo's default JAX environment — use a dedicated env, as with the
+# plant STARR-seq runners (see docs/jores_multicondition.md). Python 3.12, CUDA 12.4.
+#
+#   uv venv --python 3.12 && source .venv/bin/activate
+#   pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cu124
+#   pip install -r requirements/jores_multicondition.txt
+#   pip install -e .          # make alphagenome_ft_mpra importable (JAX-free helpers)
+
+torch==2.6.0
+
+# AlphaGenome PyTorch backbone (encoder-only fine-tuning).
+alphagenome-pytorch @ git+https://github.com/genomicsxai/alphagenome-pytorch.git
+
+# Model / head / two-stage training / config primitives. We depend on the STANDARD
+# package here (MPRAHead already supports num_outputs), NOT a fork — the Jores head is
+# just MPRAHead(num_outputs=5), head_type="mpra".
+alphagenome-encoder-ft @ git+https://github.com/MasayukiNagai/alphagenome-encoder-ft.git
+
+numpy>=2.0
+pandas>=2.0
+scipy>=1.13
+tqdm>=4.66
+
+# Zero-shot interpretability: saturation mutagenesis (perturbation) + gradients.
+tangermeme>=1.4.0
+captum>=0.9.0
+
+# Optional, not needed for train/test/zero-shot:
+#   optuna, ray[tune]   — hyperparameter search
+#   modisco             — TF-MoDISco motif discovery on attributions
+#   openpyxl            — building the modelling TSVs from the source .xlsx
