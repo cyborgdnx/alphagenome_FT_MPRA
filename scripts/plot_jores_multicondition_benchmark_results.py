@@ -58,8 +58,8 @@ PANELS = [
     ]),
     ("b", "Zero-shot perturbation", [
         ("AG · TF addition",        AG_DARK, None, "category_eval.json", ("perturbation", "insertion")),
-        ("AG · TF ablation",        AG_DARK, "///", "category_eval.json", ("perturbation", "shuffling")),
         ("plantGREP · TF addition", PG_DARK, None, "pgrep_category.json", ("perturbation", "insertion")),
+        ("AG · TF ablation",        AG_DARK, "///", "category_eval.json", ("perturbation", "shuffling")),
         ("plantGREP · TF ablation", PG_DARK, "///", "pgrep_category.json", ("perturbation", "shuffling")),
     ]),
     ("c", "Zero-shot design", [
