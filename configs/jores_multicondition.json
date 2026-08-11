@@ -1,5 +1,5 @@
 {
-  "_comment": "Jores 2026 plant multi-condition MPRA, AlphaGenome encoder + MPRAHead(num_outputs=5). Two-stage: head-only then encoder unfrozen. Hyperparameters from the released model (HPO-selected). Uses the standard alphagenome_encoder_ft (Nagai) config schema; the jores split/adapters are handled by alphagenome_ft_mpra.jores_multicondition_data, not this config. Set input_tsv/pretrained_weights via CLI.",
+  "_comment": "Jores 2026 plant multi-condition MPRA, AlphaGenome encoder + MPRAHead(num_outputs=5). Two-stage: head-only then encoder unfrozen. Hyperparameters from the released model (HPO-selected). Uses the standard alphagenome_encoder_ft (Nagai) config schema; the jores split/adapters are handled by alphagenome_ft_mpra.jores_multicondition_data, not this config. stage.second_stage_dropout/second_stage_lr_scheduler need alphagenome_encoder_ft with MasayukiNagai/alphagenome-encoder-ft#3 merged; older installs ignore them. Set input_tsv/pretrained_weights via CLI.",
   "data": {
     "input_tsv": null,
     "sequence_length": 170,
@@ -33,7 +33,9 @@
     "early_stopping_patience": 10,
     "val_evals_per_epoch": 1,
     "second_stage_lr": 0.0010117700716507588,
-    "second_stage_epochs": 250
+    "second_stage_epochs": 250,
+    "second_stage_dropout": 0.15,
+    "second_stage_lr_scheduler": "plateau"
   },
   "checkpoint": {
     "checkpoint_dir": "./results/jores_multicondition/checkpoints",
