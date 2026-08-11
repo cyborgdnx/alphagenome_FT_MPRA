@@ -182,8 +182,8 @@ def plot_jores(figsize=(14, 11)):
     ax_c = fig.add_subplot(gs[1, 0])
     for ax, panel in zip((ax_a, ax_b, ax_c), PANELS):     # a, b, c are the bar panels
         _draw_bar_panel(ax, *panel)
-    ax_a.set_ylabel("Pearson Correlation", fontsize=AXIS_FS)
-    ax_c.set_ylabel("Pearson Correlation", fontsize=AXIS_FS)
+    ax_a.set_ylabel("Pearson's r", fontsize=AXIS_FS)
+    ax_c.set_ylabel("Pearson's r", fontsize=AXIS_FS)
 
     # d: two stacked example lineages where plantGREP is very wrong, beside c.
     traj = list(csv.DictReader((REFERENCE_DIR / "evolution_trajectory_measured.csv").open()))
