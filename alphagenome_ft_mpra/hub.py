@@ -81,13 +81,12 @@ CHECKPOINTS: dict[str, dict] = {
         'framework': 'torch', 'path': 'torch/starrseq_drosophila',
         'task': 'Drosophila STARR-seq (dev + hk enhancer activity)', 'seq_len': 256,
     },
-    # Jores et al. 2026 plant multi-condition MPRA (5 conditions). Loads with a
-    # DIFFERENT package than the other torch checkpoints — see the note in
-    # load_pretrained and docs/model_weights.md.
+    # Jores et al. 2026 plant multi-condition MPRA (5 conditions), head_type="mpra",
+    # num_outputs=5 — loads with the standard package like the other torch checkpoints.
     'jores_multicondition': {
         'framework': 'torch', 'path': 'torch/jores_multicondition',
         'task': 'Jores 2026 plant MPRA — cold/dark/light/warm/maize (5 outputs)',
-        'seq_len': 170, 'package': 'alphagenome-ft-jores26',
+        'seq_len': 170,
     },
 }
 
@@ -152,28 +151,13 @@ def load_pretrained(
     root = Path(local_dir) if local_dir else download(name, repo_id=repo_id, revision=revision)
 
     if spec['framework'] == 'torch':
-        fname = 'finetuned_encoder.pt' if stage == 'stage2' else 'frozen_encoder.pt'
+        # Every torch checkpoint — including jores_multicondition (head_type="mpra",
+        # num_outputs=5) — loads with the standard alphagenome-encoder-ft package;
+        # from_checkpoint dispatches on the checkpoint's own head_type.
+        from alphagenome_encoder_ft import EncoderMPRAModel
 
-        # jores_multicondition uses a different fork of `alphagenome_encoder_ft`
-        # (github.com/katelynsyc/alphagenome-ft-jores26, class AlphaGenomeEncoderModel,
-        # head registry {mpra, joresmpra}). It has the SAME import name as Nagai's
-        # alphagenome-encoder-ft (class EncoderMPRAModel, {mpra, deepstarr}) that the
-        # other torch checkpoints need, so the two cannot be installed together —
-        # load this one from a separate environment.
-        if name == 'jores_multicondition':
-            try:
-                from alphagenome_encoder_ft import AlphaGenomeEncoderModel
-            except ImportError as e:
-                raise ImportError(
-                    "jores_multicondition needs the alphagenome-ft-jores26 fork "
-                    "(pip install git+https://github.com/katelynsyc/alphagenome-ft-jores26). "
-                    "It conflicts with the alphagenome-encoder-ft package used by the "
-                    "other torch checkpoints — use a separate environment."
-                ) from e
-            model = AlphaGenomeEncoderModel.from_checkpoint(str(root / fname))
-        else:
-            from alphagenome_encoder_ft import EncoderMPRAModel
-            model = EncoderMPRAModel.from_checkpoint(str(root / fname))
+        fname = 'finetuned_encoder.pt' if stage == 'stage2' else 'frozen_encoder.pt'
+        model = EncoderMPRAModel.from_checkpoint(str(root / fname))
         model.eval()
         return model
 

@@ -151,24 +151,20 @@ cannot load them. Use `PlantMPRAHead` (what `load_pretrained` does).
 checkpoint's `config.json`. So the metadata must be registered before calling it or the
 restore dies on a shape mismatch. Again, `load_pretrained` handles this.
 
-**`jores_multicondition` loads with a DIFFERENT package.** The other torch checkpoints
-use [`alphagenome-encoder-ft`](https://github.com/MasayukiNagai/alphagenome-encoder-ft)
-(class `EncoderMPRAModel`, head registry `{mpra, deepstarr}`). This one uses the
-[`alphagenome-ft-jores26`](https://github.com/katelynsyc/alphagenome-ft-jores26) fork
-(class `AlphaGenomeEncoderModel`, registry `{mpra, joresmpra}`). Both use the import
-name `alphagenome_encoder_ft`, so **they cannot be installed together** — load this one
-from its own environment:
+**`jores_multicondition` predicts 5 conditions and loads with the standard package.**
+Its head is just `MPRAHead(num_outputs=5)` (`head_type="mpra"`), so it loads exactly like
+the other torch checkpoints — no fork needed:
 
 ```python
-# in an env with alphagenome-ft-jores26 installed
-from alphagenome_encoder_ft import AlphaGenomeEncoderModel
-model = AlphaGenomeEncoderModel.from_checkpoint(".../jores_multicondition/finetuned_encoder.pt")
-preds = model.predict_sequences(["ACGT..."])   # raw 170bp core promoter, no adapters
-# preds[:, i] -> [cold, dark, light, warm, maize][i]
+from alphagenome_encoder_ft import EncoderMPRAModel
+model = EncoderMPRAModel.from_checkpoint(".../jores_multicondition/finetuned_encoder.pt")
+# input is the raw 170bp core promoter; the training pipeline adds the 15bp Jores
+# adapters (see alphagenome_ft_mpra.jores_multicondition_data.JoresMPRADataset).
+# output columns: [cold, dark, light, warm, maize]
 ```
 
-`hub.load_pretrained('jores_multicondition')` does this for you and raises a clear
-message if the wrong fork is installed.
+`hub.load_pretrained('jores_multicondition')` does this for you. The full
+training/testing/zero-shot pipeline is in the repo — see docs/jores_multicondition.md.
 
 **Gosai head is `GosaiMPRAHead`, not `EncoderMPRAHead`.** Same module names, but it uses
 `hk.LayerNorm` (not `alphagenome_research`'s `layers.LayerNorm`) and hard-codes the

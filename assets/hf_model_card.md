@@ -82,10 +82,9 @@ for the manual path and the gotchas.
 
 Drosophila is the mean of the two tasks (fine-tuned: dev 0.7193, hk 0.7744).
 `jores_multicondition` is the mean across 5 conditions (cold 0.822, dark 0.887,
-light 0.873, warm 0.853, maize 0.770). **It loads with a different package** —
-the [`alphagenome-ft-jores26`](https://github.com/katelynsyc/alphagenome-ft-jores26)
-fork (`AlphaGenomeEncoderModel`), not `alphagenome-encoder-ft`; the two share an import
-name and can't be installed together. See the repo docs.
+light 0.873, warm 0.853, maize 0.770). Its head is `MPRAHead(num_outputs=5)`
+(`head_type="mpra"`), so it loads with the **standard** `alphagenome-encoder-ft` like
+the other torch checkpoints — output columns `[cold, dark, light, warm, maize]`.
 
 ### `jax/` — plant STARR-seq (Jores 2021), test Pearson r
 
