@@ -1,0 +1,50 @@
+{
+  "n_samples": 33300,
+  "per_condition": {
+    "cold": {
+      "mse": 0.517039954662323,
+      "rmse": 0.7190549037885237,
+      "mae": 0.5460364818572998,
+      "pearsonr": 0.8217497017164777,
+      "spearmanr": 0.8186183790255652
+    },
+    "dark": {
+      "mse": 0.5165819525718689,
+      "rmse": 0.718736358181405,
+      "mae": 0.541774332523346,
+      "pearsonr": 0.8874064222506162,
+      "spearmanr": 0.8813065195498394
+    },
+    "light": {
+      "mse": 0.416171133518219,
+      "rmse": 0.6451132718509355,
+      "mae": 0.47567492723464966,
+      "pearsonr": 0.8734470217047026,
+      "spearmanr": 0.8772386762350898
+    },
+    "warm": {
+      "mse": 0.4019143879413605,
+      "rmse": 0.6339671820696718,
+      "mae": 0.47353872656822205,
+      "pearsonr": 0.8531184701864738,
+      "spearmanr": 0.8582080545916208
+    },
+    "maize": {
+      "mse": 0.3963548243045807,
+      "rmse": 0.6295671721941835,
+      "mae": 0.47180670499801636,
+      "pearsonr": 0.77012424106466,
+      "spearmanr": 0.725915956464202
+    }
+  },
+  "mean_mse": 0.4496124505996704,
+  "mean_rmse": 0.6692877776169439,
+  "mean_mae": 0.5017662346363068,
+  "mean_pearsonr": 0.841169171384586,
+  "mean_spearmanr": 0.8322575171732634,
+  "checkpoint_path": "models/jores_multicondition/checkpoints/stage2/best.pt",
+  "output_dir": "models/jores_multicondition/analysis/stage2/evaluation/best_test_eval",
+  "save_mode": "minimal",
+  "checkpoint_stage": "stage2",
+  "checkpoint_epoch": 58.0
+}
