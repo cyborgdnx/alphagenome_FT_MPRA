@@ -40,12 +40,16 @@ CONDITIONS = ["light", "dark", "warm", "cold", "maize"]
 CONDITION_DISPLAY = ["Light", "Dark", "Warm", "Cold", "Dark"]
 SPECIES_GROUPS = [(0, 3, "Tobacco"), (4, 4, "Maize")]
 
-# Colour is by MODEL, consistent across panels: AlphaGenome = blue/navy family,
-# plantGREP = grey. Within a model, the paired conditions (probing/fine-tuned in (a),
-# TF addition/ablation in (b)) are the dark/light shades of that model's colour.
-AG_DARK, AG_LIGHT = "#394165", "#80A0C7"      # navy / steel blue
-PG_DARK, PG_LIGHT = "#8B9DAF", "#C6CCD1"      # grey / light grey
-MEASURED_COLOR = "#B0413E"                    # brick red — distinct from AG navy / pG grey
+# Colour is by MODEL, consistent across panels and with the repo's other figures:
+# AlphaGenome = blue/navy family, plantGREP = the grey-cream CNN-baseline colour. Within
+# AlphaGenome, the paired conditions (probing/fine-tuned in (a), TF addition/ablation in
+# (b)) are the dark/light shades of the navy.
+AG_DARK, AG_LIGHT = "#394165", "#80A0C7"      # navy / steel blue — AlphaGenome
+                                              # (Fine-tuned / Probing), as in the other figures
+PG_FILL = "#D6D1C7"                           # grey-cream CNN baseline — the colour the other
+                                              # repo figures give the Jores CNN
+PG_TEXT = "#7E7869"                           # its dark companion: value labels + trajectory line
+MEASURED_COLOR = "#B0413E"                    # brick red — distinct from AG navy / CNN cream
 
 # Each bar: (label, colour, hatch, reference file, nested path above per_condition).
 # In (b), addition and ablation share the model colour and differ only by hatch, and are
@@ -56,22 +60,22 @@ PANELS = [
     ("a", "Held-out test", 33300, [
         ("AG (Probing)",     AG_LIGHT, None, "test_probing.json",   ()),
         ("AG (Fine-tuned)",  AG_DARK,  None, "test_finetuned.json", ()),
-        ("plantGREP",        PG_DARK,  None, "pgrep_test.json",      ()),
+        ("plantGREP",        PG_FILL,  None, "pgrep_test.json",      ()),
     ]),
     ("b", "Zero-shot perturbation", 22791, [
         ("AG · TF addition",        AG_DARK, None, "category_eval.json", ("perturbation", "insertion")),
-        ("plantGREP · TF addition", PG_DARK, None, "pgrep_category.json", ("perturbation", "insertion")),
+        ("plantGREP · TF addition", PG_FILL, None, "pgrep_category.json", ("perturbation", "insertion")),
         ("AG · TF ablation",        AG_DARK, "///", "category_eval.json", ("perturbation", "shuffling")),
-        ("plantGREP · TF ablation", PG_DARK, "///", "pgrep_category.json", ("perturbation", "shuffling")),
+        ("plantGREP · TF ablation", PG_FILL, "///", "pgrep_category.json", ("perturbation", "shuffling")),
     ]),
     ("c", "Zero-shot design", 9665, [
         ("AG (Fine-tuned)", AG_DARK, None, "evolution_by_objective.json", ()),
-        ("plantGREP",       PG_DARK, None, "pgrep_evolution_by_objective.json", ()),
+        ("plantGREP",       PG_FILL, None, "pgrep_evolution_by_objective.json", ()),
     ]),
 ]
 
 # Darker stand-in text for the lighter bars so value labels stay legible.
-TEXT_COLORS = {AG_LIGHT: "#4A6A8C", PG_DARK: "#5A6A7A", PG_LIGHT: "#6E7479"}
+TEXT_COLORS = {AG_LIGHT: "#4A6A8C", PG_FILL: PG_TEXT}
 
 # Font sizes, matched to the repo's other figures (seaborn font_scale 1.2, title ~13-14,
 # axis labels 12, ticks/legend ~9-10, panel letters bold).
@@ -150,11 +154,14 @@ def _draw_trajectory(ax, rows, title, letter=None, show_xlabel=True, show_legend
     series = [
         ("Measured",    "warm_measured", MEASURED_COLOR, "o"),
         ("AlphaGenome", "warm_ag",       AG_DARK,        "s"),
-        ("plantGREP",   "warm_pg",       PG_DARK,        "^"),
+        ("plantGREP",   "warm_pg",       PG_FILL,        "^"),
     ]
     for label, col, color, marker in series:
+        # Black-edged markers (matching the black-edged bars) keep the light plantGREP
+        # cream line legible against white.
         ax.plot(muts, [float(r[col]) for r in rows], "-", color=color, linewidth=2,
-                marker=marker, markersize=7, label=label)
+                marker=marker, markersize=7, markeredgecolor="black",
+                markeredgewidth=0.8, label=label)
 
     ax.set_title(title, fontsize=TICK_FS)
     if letter:
