@@ -489,6 +489,11 @@ def main() -> None:
                        help='Save a scatter plot for the best-performing'
                             ' (output_type, metric) combination.')
 
+  parser.add_argument('--log_transform', action='store_true', default=True)
+  parser.add_argument('--no_log_transform', dest='log_transform', action='store_false',
+                     help='Disable log-transforming the pooled prediction before'
+                          ' computing Pearson r. On by default.')
+
   args = parser.parse_args()
 
   if args.source == 'local' and not args.local_checkpoint_dir:
@@ -633,8 +638,9 @@ def main() -> None:
     if n_valid < 3:
       pearson = spearman = float('nan')
     else:
-      pearson, _ = pearsonr(pred[valid], score[valid])
-      spearman, _ = spearmanr(pred[valid], score[valid])
+      pred_for_corr = np.log1p(pred) if args.log_transform else pred
+      pearson, _ = pearsonr(pred_for_corr[valid], score[valid])
+      spearman, _ = spearmanr(pred_for_corr[valid], score[valid])
     metric_rows.append({
         'output_type': output_type.name,
         'ontology': ','.join(args.ontology_curie) if args.ontology_curie else 'ALL',
