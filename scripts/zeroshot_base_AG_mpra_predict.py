@@ -302,6 +302,32 @@ def list_ontologies(
     with pd.option_context('display.max_rows', 200, 'display.width', 160):
       print(uniq.sort_values('ontology_curie').to_string(index=False))
 
+def validate_ontology_curies(
+    curies: list[str],
+    model: dna_model.AlphaGenomeModel,
+    output_types: list[dna_output.OutputType],
+    organism: dna_model.Organism,
+) -> None:
+  """Raises ValueError if any requested CURIE matches zero tracks across
+  all requested output types. A CURIE only needs to match ONE output type
+  to be valid (e.g. a CAGE-specific curie alongside an RNA_SEQ-specific
+  one in the same --ontology_curie list is a legitimate, intentional use)."""
+  metadata = model._metadata[organism]  # pylint: disable=protected-access
+  valid_curies = set()
+  for output_type in output_types:
+    df = metadata.get(output_type)
+    if df is not None and 'ontology_curie' in df:
+      valid_curies.update(df['ontology_curie'])
+
+  bad_curies = [c for c in curies if c not in valid_curies]
+  if bad_curies:
+    raise ValueError(
+        f'--ontology_curie value(s) {bad_curies} match zero tracks for'
+        f' output types {[t.name for t in output_types]} and organism'
+        f' {organism.name}. Use --list_ontologies to see valid CURIEs for'
+        ' these output types before retrying.'
+    )
+
 
 # ---------------------------------------------------------------------------
 # Prediction + pooling
@@ -521,6 +547,9 @@ def main() -> None:
       args.source, args.model_version, args.device,
       local_checkpoint_dir=args.local_checkpoint_dir,
   )
+
+  if args.ontology_curie:
+    validate_ontology_curies(args.ontology_curie, model, output_types, organism)
 
   if args.list_ontologies:
     list_ontologies(model, output_types, organism)
