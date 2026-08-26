@@ -496,6 +496,17 @@ def main() -> None:
 
   args = parser.parse_args()
 
+  # -------------------------------------------------------------------
+  # Printing all arguments
+  # -------------------------------------------------------------------
+
+  print('=' * 72)
+  print('Arguments:')
+  max_len = max(len(k) for k in vars(args))
+  for arg, value in sorted(vars(args).items()):
+      print(f'  --{arg:<{max_len}} : {value}')
+  print('=' * 72)
+
   if args.source == 'local' and not args.local_checkpoint_dir:
     parser.error('--local_checkpoint_dir is required when --source local')
 
