@@ -96,6 +96,7 @@ from scipy.stats import pearsonr, spearmanr
 from alphagenome.data import ontology
 from alphagenome.models import dna_output
 from alphagenome_research.model import dna_model
+from alphagenome_research.model.metadata import metadata as metadata_lib
 
 # MIN_SAFE_SEQUENCE_LENGTH = 4096
 
@@ -300,26 +301,46 @@ def load_model(
 # ---------------------------------------------------------------------------
 
 
+# def list_ontologies(
+#     model: dna_model.AlphaGenomeModel,
+#     output_types: Iterable[dna_output.OutputType],
+#     organism: dna_model.Organism,
+# ) -> None:
+#     """Prints available (ontology_curie, track name) pairs for each output type."""
+#     metadata = model._metadata[organism]  # pylint: disable=protected-access
+#     for output_type in output_types:
+#         df = metadata.get(output_type)
+#         if df is None:
+#             print(f"\n[{output_type.name}] not available for {organism.name}.")
+#             continue
+#         print(f"\n[{output_type.name}] {len(df)} tracks total.")
+#         if "ontology_curie" not in df:
+#             print("  (tissue/ontology agnostic output type)")
+#             continue
+#         sub_cols = [c for c in ("ontology_curie", "name", "biosample_name") if c in df]
+#         uniq = df[sub_cols].drop_duplicates(subset=["ontology_curie"])
+#         with pd.option_context("display.max_rows", 200, "display.width", 160):
+#             print(uniq.sort_values("ontology_curie").to_string(index=False))
+
+
 def list_ontologies(
-    model: dna_model.AlphaGenomeModel,
-    output_types: Iterable[dna_output.OutputType],
-    organism: dna_model.Organism,
+        output_types: Iterable[dna_output.OutputType],
+        organism: dna_model.Organism,
 ) -> None:
-    """Prints available (ontology_curie, track name) pairs for each output type."""
-    metadata = model._metadata[organism]  # pylint: disable=protected-access
+    metadata = metadata_lib.load(organism)
     for output_type in output_types:
-        df = metadata.get(output_type)
-        if df is None:
-            print(f"\n[{output_type.name}] not available for {organism.name}.")
-            continue
-        print(f"\n[{output_type.name}] {len(df)} tracks total.")
-        if "ontology_curie" not in df:
-            print("  (tissue/ontology agnostic output type)")
-            continue
-        sub_cols = [c for c in ("ontology_curie", "name", "biosample_name") if c in df]
-        uniq = df[sub_cols].drop_duplicates(subset=["ontology_curie"])
-        with pd.option_context("display.max_rows", 200, "display.width", 160):
-            print(uniq.sort_values("ontology_curie").to_string(index=False))
+            df = metadata.get(output_type)
+            if df is None:
+                print(f"\n[{output_type.name}] not available for {organism.name}.")
+                continue
+            print(f"\n[{output_type.name}] {len(df)} tracks total.")
+            if "ontology_curie" not in df:
+                print("  (tissue/ontology agnostic output type)")
+                continue
+            sub_cols = [c for c in ("ontology_curie", "name", "biosample_name") if c in df]
+            uniq = df[sub_cols].drop_duplicates(subset=["ontology_curie"])
+            with pd.option_context("display.max_rows", 200, "display.width", 160):
+                print(uniq.sort_values("ontology_curie").to_string(index=False))
 
 
 def validate_ontology_curies(
@@ -628,6 +649,11 @@ def main() -> None:
             'pool_track assumes 1bp-resolution tracks. Supported types: '
             f'{[t.name for t in SUPPORTED_OUTPUT_TYPES]}.'
         )
+
+    if args.list_ontologies:
+        list_ontologies(output_types, organism)
+        return
+    
     ontology_terms = (
         [ontology.from_curie(c) for c in args.ontology_curie]
         if args.ontology_curie
