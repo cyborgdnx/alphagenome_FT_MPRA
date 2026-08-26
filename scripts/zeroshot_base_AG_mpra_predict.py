@@ -98,7 +98,7 @@ from alphagenome.models import dna_output
 from alphagenome_research.model import dna_model
 
 
-MIN_SAFE_SEQUENCE_LENGTH = 65536
+# MIN_SAFE_SEQUENCE_LENGTH = 4096
 
 
 # ---------------------------------------------------------------------------
@@ -450,12 +450,14 @@ def main() -> None:
                             ' excluded from the pooled score. Set explicitly'
                             ' to pool a fixed window instead (e.g. 384, the'
                             ' window used by test_cagi5_zero_shot_base.py).')
+  parser.add_argument('--input_length', type=int, default=4096,
+                       help='The input legnth for AG model')
 
   parser.add_argument('--standardize_length', type=int,
-                       default=MIN_SAFE_SEQUENCE_LENGTH,
+                       default=4096,
                        help='Center-pads (with \'N\') or center-crops every'
                             ' construct to this many bp before scoring.'
-                            f' Default: {MIN_SAFE_SEQUENCE_LENGTH} (2**16) --'
+                            f' Default: 4096 --'
                             ' AlphaGenome\'s pairwise attention machinery'
                             ' needs a minimum input length to run at all;'
                             ' feeding short MPRA inserts (a few hundred bp)'
@@ -554,10 +556,10 @@ def main() -> None:
   df['_pre_padding_length'] = pre_padding_lengths
   df['_construct_length'] = [len(c) for c in constructs]
 
-  if not args.standardize_length and (df['_pre_padding_length'] < MIN_SAFE_SEQUENCE_LENGTH).any():
+  if not args.standardize_length and (df['_pre_padding_length'] < args.input_length).any():
     print(
         f'WARNING: --standardize_length is disabled and some constructs are'
-        f' shorter than {MIN_SAFE_SEQUENCE_LENGTH}bp. AlphaGenome\'s pairwise'
+        f' shorter than {args.input_length}bp. AlphaGenome\'s pairwise'
         ' attention machinery requires a minimum input length; short raw'
         " sequences WILL raise a JAX shape-broadcast error in"
         ' predict_sequence. Re-enable padding (the default) unless you are'
