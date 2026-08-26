@@ -99,6 +99,14 @@ from alphagenome_research.model import dna_model
 
 # MIN_SAFE_SEQUENCE_LENGTH = 4096
 
+SUPPORTED_OUTPUT_TYPES = {
+    dna_output.OutputType.CAGE,
+    dna_output.OutputType.RNA_SEQ,
+    dna_output.OutputType.DNASE,
+    dna_output.OutputType.ATAC,
+    dna_output.OutputType.PROCAP,
+}
+
 
 # ---------------------------------------------------------------------------
 # Sequence construction helpers
@@ -613,6 +621,13 @@ def main() -> None:
 
     organism = dna_model.Organism.HOMO_SAPIENS
     output_types = [dna_output.OutputType[name.upper()] for name in args.output_types]
+    bad_types = [ot for ot in output_types if ot not in SUPPORTED_OUTPUT_TYPES]
+    if bad_types:
+        parser.error(
+            f'--output_types {[t.name for t in bad_types]} not supported: '
+            'pool_track assumes 1bp-resolution tracks. Supported types: '
+            f'{[t.name for t in SUPPORTED_OUTPUT_TYPES]}.'
+        )
     ontology_terms = (
         [ontology.from_curie(c) for c in args.ontology_curie]
         if args.ontology_curie
