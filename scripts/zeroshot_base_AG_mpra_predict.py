@@ -750,9 +750,6 @@ def main() -> None:
                     preds = {ot.name: float("nan") for ot in output_types}
             batch_preds.append(preds)
         records.extend(batch_preds)
-        elapsed = time.time() - t0
-        rate = min((batch_idx + 1) * args.batch_size, len(constructs)) / elapsed
-        print(f"  {len(records)}/{len(constructs)} sequences ({rate:.2f}/s)", end="\r")
 
     print()
     total_time = time.time() - t0
