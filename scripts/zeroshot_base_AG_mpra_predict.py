@@ -85,10 +85,13 @@ import time
 from pathlib import Path
 from typing import Iterable
 from tqdm import tqdm
+import traceback
 
 import numpy as np
 import pandas as pd
 from scipy.stats import pearsonr, spearmanr
+import jax
+import jax.numpy as jnp
 
 # --- AlphaGenome imports -----------------------------------------------
 # NOTE: `alphagenome` (the base API/typing/client package) and
@@ -301,46 +304,24 @@ def load_model(
 # ---------------------------------------------------------------------------
 
 
-# def list_ontologies(
-#     model: dna_model.AlphaGenomeModel,
-#     output_types: Iterable[dna_output.OutputType],
-#     organism: dna_model.Organism,
-# ) -> None:
-#     """Prints available (ontology_curie, track name) pairs for each output type."""
-#     metadata = model._metadata[organism]  # pylint: disable=protected-access
-#     for output_type in output_types:
-#         df = metadata.get(output_type)
-#         if df is None:
-#             print(f"\n[{output_type.name}] not available for {organism.name}.")
-#             continue
-#         print(f"\n[{output_type.name}] {len(df)} tracks total.")
-#         if "ontology_curie" not in df:
-#             print("  (tissue/ontology agnostic output type)")
-#             continue
-#         sub_cols = [c for c in ("ontology_curie", "name", "biosample_name") if c in df]
-#         uniq = df[sub_cols].drop_duplicates(subset=["ontology_curie"])
-#         with pd.option_context("display.max_rows", 200, "display.width", 160):
-#             print(uniq.sort_values("ontology_curie").to_string(index=False))
-
-
 def list_ontologies(
-        output_types: Iterable[dna_output.OutputType],
-        organism: dna_model.Organism,
+    output_types: Iterable[dna_output.OutputType],
+    organism: dna_model.Organism,
 ) -> None:
     metadata = metadata_lib.load(organism)
     for output_type in output_types:
-            df = metadata.get(output_type)
-            if df is None:
-                print(f"\n[{output_type.name}] not available for {organism.name}.")
-                continue
-            print(f"\n[{output_type.name}] {len(df)} tracks total.")
-            if "ontology_curie" not in df:
-                print("  (tissue/ontology agnostic output type)")
-                continue
-            sub_cols = [c for c in ("ontology_curie", "name", "biosample_name") if c in df]
-            uniq = df[sub_cols].drop_duplicates(subset=["ontology_curie"])
-            with pd.option_context("display.max_rows", 200, "display.width", 160):
-                print(uniq.sort_values("ontology_curie").to_string(index=False))
+        df = metadata.get(output_type)
+        if df is None:
+            print(f"\n[{output_type.name}] not available for {organism.name}.")
+            continue
+        print(f"\n[{output_type.name}] {len(df)} tracks total.")
+        if "ontology_curie" not in df:
+            print("  (tissue/ontology agnostic output type)")
+            continue
+        sub_cols = [c for c in ("ontology_curie", "name", "biosample_name") if c in df]
+        uniq = df[sub_cols].drop_duplicates(subset=["ontology_curie"])
+        with pd.option_context("display.max_rows", 200, "display.width", 160):
+            print(uniq.sort_values("ontology_curie").to_string(index=False))
 
 
 def validate_ontology_curies(
@@ -458,6 +439,83 @@ def predict_one_sequence(
     }
 
 
+def predict_batch(
+    model: dna_model.AlphaGenomeModel,
+    sequences: list[str],
+    *,
+    organism: dna_model.Organism,
+    output_types: Iterable[dna_output.OutputType],
+    ontology_terms: list[ontology.OntologyTerm] | None,
+    pooling: str,
+    center_window_bp: int | None,
+) -> list[dict[str, float]]:
+    """Runs the base model on a batch of sequences. (NOTE: Strands are currently ignored)"""
+    lengths = {len(s) for s in sequences}
+    if len(lengths) > 1:
+        raise ValueError(
+            f"predict_batch requires every sequence to be the same length"
+            f" (got lengths {lengths}) -- pad all sequences to the same"
+            " --pad_length before calling this."
+        )
+
+    output_types = tuple(set(output_types))
+    window_bps = [
+        center_window_bp if center_window_bp is not None else len(seq.strip("N"))
+        for seq in sequences
+    ]
+
+    one_hot_batch = np.stack(
+        [np.asarray(model._one_hot_encoder.encode(seq)) for seq in sequences], axis=0
+    )
+
+    organism_idx = 0 if organism == dna_model.Organism.HOMO_SAPIENS else 1
+    organism_index = np.full((len(sequences),), organism_idx, dtype=np.int32)
+
+    batched_output = model._predict(
+        model._params,
+        model._state,
+        one_hot_batch,
+        organism_index,
+        requested_outputs=output_types,
+        negative_strand_mask=jnp.zeros(one_hot_batch.shape[0], dtype=bool),
+        strand_reindexing=jax.device_put(
+            model._metadata[organism].strand_reindexing, model._device_context._device
+        ),
+    )
+
+    results = []
+
+    for idx, window_bp in enumerate(window_bps):
+        per_seq_result = {}
+        for output_type in output_types:
+            track_output = batched_output.get(output_type)
+            if track_output is None:
+                per_seq_result[output_type.name] = float("nan")
+                continue
+            values_idx = np.asarray(track_output)[idx]
+            mask = ontology_mask(model, organism, output_type, ontology_terms)
+            if mask is not None:
+                values_idx = values_idx[..., mask]
+            pooled = pool_track(
+                values_idx,
+                pooling=pooling,
+                center_window_bp=window_bp,
+            )
+            per_seq_result[output_type.name] = pooled
+        results.append(per_seq_result)
+    return results
+
+
+def ontology_mask(model, organism, output_type, ontology_terms):
+    if ontology_terms is None:
+        return None
+    df = model._metadata[organism].get(output_type)
+    if df is None or "ontology_curie" not in df:
+        return None
+    requested = {o.ontology_curie for o in ontology_terms}
+    return np.array([c in requested for c in df["ontology_curie"]])
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -499,7 +557,7 @@ def main() -> None:
         "--model_version",
         type=str,
         default="all_folds",
-        help="e.g. 'all_folds' or 'fold_0'. Ignored when" " --source local.",
+        help="e.g. 'all_folds' or 'fold_0'. Ignored when --source local.",
     )
     parser.add_argument(
         "--local_checkpoint_dir",
@@ -537,7 +595,7 @@ def main() -> None:
     parser.add_argument(
         "--list_ontologies",
         action="store_true",
-        help="Print available ontology terms for" " --output_types and exit.",
+        help="Print available ontology terms for --output_types and exit.",
     )
 
     parser.add_argument(
@@ -559,7 +617,10 @@ def main() -> None:
         " window used by test_cagi5_zero_shot_base.py).",
     )
     parser.add_argument(
-        "--input_length", type=int, default=4096, help="The input legnth for AG model"
+        "--input_length", type=int, default=4096, help="The input length for AG model"
+    )
+    parser.add_argument(
+        "--batch_size", type=int, default=8, help="For making batched predictions"
     )
 
     parser.add_argument(
@@ -597,8 +658,7 @@ def main() -> None:
     parser.add_argument(
         "--reverse_complement_avg",
         action="store_true",
-        help="Average forward-strand and reverse-complement"
-        " predictions per sequence.",
+        help="Average forward-strand and reverse-complement predictions per sequence.",
     )
 
     parser.add_argument(
@@ -645,15 +705,15 @@ def main() -> None:
     bad_types = [ot for ot in output_types if ot not in SUPPORTED_OUTPUT_TYPES]
     if bad_types:
         parser.error(
-            f'--output_types {[t.name for t in bad_types]} not supported: '
-            'pool_track assumes 1bp-resolution tracks. Supported types: '
-            f'{[t.name for t in SUPPORTED_OUTPUT_TYPES]}.'
+            f"--output_types {[t.name for t in bad_types]} not supported: "
+            "pool_track assumes 1bp-resolution tracks. Supported types: "
+            f"{[t.name for t in SUPPORTED_OUTPUT_TYPES]}."
         )
 
     if args.list_ontologies:
         list_ontologies(output_types, organism)
         return
-    
+
     ontology_terms = (
         [ontology.from_curie(c) for c in args.ontology_curie]
         if args.ontology_curie
@@ -754,39 +814,64 @@ def main() -> None:
     print(
         f"\nRunning zero-shot AlphaGenome predictions for output types:"
         f" {[t.name for t in output_types]}"
-        f' | ontology: {args.ontology_curie or "ALL (averaged)"}'
+        f" | ontology: {args.ontology_curie or 'ALL (averaged)'}"
         f" | pooling: {args.pooling}"
-        f'{center_window_desc if args.pooling == "center_window" else ""}'
+        f"{center_window_desc if args.pooling == 'center_window' else ''}"
     )
+
     records = []
     t0 = time.time()
-    for i, construct in tqdm(
-        enumerate(df["_construct"]), desc="Predicting", total=len(df)
-    ):
-        row_center_window_bp = (
-            args.center_window_bp
-            if args.center_window_bp is not None
-            else int(df["_pre_padding_length"].iloc[i])
-        )
+    constructs = df["_construct"].tolist()
+    n_batches = (len(constructs) + args.batch_size - 1) // args.batch_size
+
+    for batch_idx in tqdm(range(n_batches), desc="Predicting"):
+        start = batch_idx * args.batch_size
+        batch = constructs[start : start + args.batch_size]
         try:
-            preds = predict_one_sequence(
+            batch_preds = predict_batch(
                 model,
-                construct,
+                batch,
                 organism=organism,
                 output_types=output_types,
                 ontology_terms=ontology_terms,
-                use_reverse_complement=args.reverse_complement_avg,
                 pooling=args.pooling,
-                center_window_bp=row_center_window_bp,
+                center_window_bp=args.center_window_bp,
             )
-        except Exception as e:  # pylint: disable=broad-except
-            print(f"\n  WARNING: prediction failed for row {i}: {e}", file=sys.stderr)
-            preds = {ot.name: float("nan") for ot in output_types}
-        records.append(preds)
-        if (i + 1) % 25 == 0 or (i + 1) == len(df):
-            elapsed = time.time() - t0
-            rate = (i + 1) / elapsed
-            print(f"  {i + 1}/{len(df)} sequences ({rate:.2f}/s)", end="\r")
+        except Exception as e:
+            print(
+                f"\n  WARNING: prediction failed for batch {batch_idx}: {traceback.print_exc()}"
+            )
+            batch_preds = []
+            row_center_window_bp = (
+                args.center_window_bp
+                if args.center_window_bp is not None
+                else int(df["_pre_padding_length"].iloc[i])
+            )
+            for i, construct in tqdm(
+                enumerate(df["_construct"]), desc="Predicting", total=len(df)
+            ):
+                try:
+                    preds = predict_one_sequence(
+                        model,
+                        construct,
+                        organism=organism,
+                        output_types=output_types,
+                        ontology_terms=ontology_terms,
+                        use_reverse_complement=args.reverse_complement_avg,
+                        pooling=args.pooling,
+                        center_window_bp=row_center_window_bp,
+                    )
+                except Exception as e:  # pylint: disable=broad-except
+                    print(
+                        f"\n  WARNING: prediction failed for row {i}: {traceback.print_exc()}"
+                    )
+                    preds = {ot.name: float("nan") for ot in output_types}
+            batch_preds.append(preds)
+        records.extend(batch_preds)
+        elapsed = time.time() - t0
+        rate = min((batch_idx + 1) * args.batch_size, len(constructs)) / elapsed
+        print(f"  {len(records)}/{len(constructs)} sequences ({rate:.2f}/s)", end="\r")
+
     print()
     total_time = time.time() - t0
     print(f"Done in {total_time:.1f}s ({total_time / len(df) * 1000:.1f} ms/sequence)")
