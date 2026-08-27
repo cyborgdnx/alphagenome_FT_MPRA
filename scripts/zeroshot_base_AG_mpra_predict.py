@@ -489,7 +489,7 @@ def main() -> None:
     parser.add_argument(
         "--center_window_bp",
         type=int,
-        default=None,
+        default=501,
         help="Used only when --pooling center_window. Default"
         " (None): auto -- use each sequence's own"
         " original (pre-padding, pre-adapter) length, so"
