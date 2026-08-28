@@ -86,6 +86,7 @@ from pathlib import Path
 from typing import Iterable
 from tqdm import tqdm
 import traceback
+import string
 
 import numpy as np
 import pandas as pd
@@ -164,6 +165,7 @@ def build_construct(
     right_adapter: str | None,
     promoter: str | None,
     barcode: str | None,
+    template: str = "{left_adapter}{insert}{right_adapter}{promoter}{barcode}",
 ) -> str:
     """Assembles a full reporter construct around a variable insert.
 
@@ -171,21 +173,32 @@ def build_construct(
     (the default), this is the identity function -- the insert is scored
     exactly as provided. Set these if you know your MPRA vector's fixed
     flanking elements and want to present AlphaGenome with a more realistic
-    construct (this is what `alphagenome_ft_mpra.oracle.MPRAOracle` calls
-    "core" mode, and what `LentiMPRADataset.__getitem__` does with its
-    `promoter_seq` + `rand_barcode`).
+    construct.
     """
-    parts = []
-    if left_adapter:
-        parts.append(left_adapter)
-    parts.append(insert)
-    if right_adapter:
-        parts.append(right_adapter)
-    if promoter:
-        parts.append(promoter)
-    if barcode:
-        parts.append(barcode)
-    return "".join(parts)
+
+    values = {
+        "insert": insert,
+        "left_adapter": left_adapter or "",
+        "right_adapter": right_adapter or "",
+        "promoter": promoter or "",
+        "barcode": barcode or "",
+    }
+
+    field_names = {name for _, name, _, _ in string.Formatter().parse(template) if name}
+
+    unknown = field_names - set(values)
+    if unknown:
+        raise ValueError(
+            f"Unknown placeholder(s) {sorted(unknown)} in --construct_template."
+            f" Valid placeholders: {sorted(values)}."
+        )
+    if "insert" not in field_names:
+        raise ValueError(
+            "--construct_template must include '{insert}' -- the variable"
+            " sequence being scored can't be silently omitted."
+        )
+
+    return template.format(**values)
 
 
 # ---------------------------------------------------------------------------
@@ -536,6 +549,17 @@ def main() -> None:
         " (see LentiMPRA construct in data.py).",
     )
     parser.add_argument("--barcode", type=str, default=None)
+    parser.add_argument(
+        "--construct_template",
+        type=str,
+        default="{left_adapter}{insert}{right_adapter}{promoter}{barcode}",
+        help="Format-string controlling MPRA construct layout, using named"
+        " placeholders {insert} (required), {left_adapter},"
+        " {right_adapter}, {promoter}, {barcode}. Default matches"
+        " lentiMPRA (fixed promoter appended after the insert). For"
+        " STARR-seq (insert cloned downstream of the promoter), use e.g."
+        " '{promoter}{insert}{barcode}'.",
+    )
 
     parser.add_argument(
         "--reverse_complement_avg",
