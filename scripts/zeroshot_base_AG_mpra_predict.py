@@ -269,6 +269,18 @@ def pool_track(
     `values` is averaged across tracks first (e.g. multiple CAGE assays
     matching the same ontology term), then pooled across sequence positions.
 
+    NOTE ON STRAND: for strand-specific output types (CAGE, PROCAP, RNA_SEQ),
+    a single cell type/ontology term can match BOTH a '+' strand track and a
+    '-' strand track -- e.g. K562 CAGE resolves to two tracks, one per
+    strand. This function's track-averaging step does not distinguish them:
+    sense and antisense signal get averaged together into one number. This
+    can mask strongly directional promoter activity (e.g. high '+', near-
+    zero '-' averaging to a misleadingly moderate value indistinguishable
+    from a weak bidirectional promoter). If strand matters for your
+    interpretation, inspect --list_ontologies' track metadata for the
+    output types you're using to check how many tracks match per ontology
+    term, and consider whether averaging them is appropriate for your case.
+
     `center_window_bp=None` with `pooling='center_window'` means "use the
     whole `values` array as the window" -- callers that pad sequences (see
     MIN_SAFE_SEQUENCE_LENGTH) should pass the *original*, pre-padding insert
@@ -475,7 +487,12 @@ def main() -> None:
         type=str,
         nargs="+",
         default=["CAGE", "RNA_SEQ", "DNASE"],
-        help="One or more of: " + ", ".join(t.name for t in dna_output.OutputType),
+        help="One or more of: "
+        + ", ".join(t.name for t in SUPPORTED_OUTPUT_TYPES)
+        + ". Note: CAGE/PROCAP/RNA_SEQ are strand-specific"
+        " -- sense and antisense tracks are averaged"
+        " together with no strand separation; see"
+        " pool_track docstring.",
     )
     parser.add_argument(
         "--ontology_curie",
