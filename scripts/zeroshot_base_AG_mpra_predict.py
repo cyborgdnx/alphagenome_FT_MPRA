@@ -12,7 +12,7 @@ WHAT THIS SCRIPT DOES
 3. Optionally assembles a full reporter construct (insert + promoter +
    barcode / adapters) if you know your assay's vector design -- off by
    default, in which case your sequence is used exactly as given.
-4. Runs `model.predict_sequence(...)` on each construct and extracts one or
+4. Runs `model.predict_sequence(...)` or `model._predict(...)` on each construct and extracts one or
    more genomic-track outputs (CAGE / RNA_SEQ / DNASE / ATAC / PROCAP) for the
    cell type(s) / ontology term(s) you specify.
 5. Pools each track's per-base-pair signal into a single scalar per sequence
@@ -31,12 +31,12 @@ USAGE EXAMPLES
 --------------
 # 1. See what cell types / ontology terms exist for a given output type
 #    (useful before you pick --ontology_curie values):
-    python zero_shot_mpra_predict.py --list_ontologies --output_types CAGE
+    python zeroshot_base_AG_mpra_predict.py --list_ontologies --output_types CAGE
 
 # 2. Basic zero-shot scan across multiple readouts, no cell-type restriction
 #    (averages over ALL tracks of each output type -- a generic, pan-context
 #    proxy; good first pass when you don't know which cell type matters):
-    python zero_shot_mpra_predict.py \\
+    python zeroshot_base_AG_mpra_predict.py \\
         --input my_mpra_test_set.tsv \\
         --sequence_col sequence --score_col score \\
         --output_types CAGE RNA_SEQ DNASE
@@ -44,33 +44,39 @@ USAGE EXAMPLES
 # 3. Restrict to a specific cell type (e.g. K562 CAGE + DNase), and pool
 #    over the center 384bp of the prediction track (AlphaGenome's typical
 #    scoring window, see test_cagi5_zero_shot_base.py):
-    python zero_shot_mpra_predict.py \\
+    python zeroshot_base_AG_mpra_predict.py \\
         --input my_mpra_test_set.tsv \\
         --output_types CAGE DNASE \\
         --ontology_curie EFO:0002067 \\
         --pooling center_window --center_window_bp 384
 
-# 4. If your 600bp inserts need a fixed downstream minimal-promoter +
+# 4. If, for example, your 600bp inserts need a fixed downstream minimal-promoter +
 #    barcode appended to mimic your real reporter vector before scoring
 #    (like LentiMPRA's `promoter_seq` + `rand_barcode` in
 #    alphagenome_ft_mpra/data.py):
-    python zero_shot_mpra_predict.py \\
+    python zeroshot_base_AG_mpra_predict.py \\
         --input my_mpra_test_set.tsv \\
         --promoter TCCATTATATACCCTCTAGTGTCGGTTCACGCAATG \\
         --barcode AGAGACTGAGGCCAC \\
         --output_types RNA_SEQ
 
 # 5. Quick smoke-test on the first 20 rows only, on CPU:
-    python zero_shot_mpra_predict.py --input my_mpra_test_set.tsv \\
+    python zeroshot_base_AG_mpra_predict.py --input my_mpra_test_set.tsv \\
         --max_sequences 20 --device cpu
+
+# 6. A STARR-Seq example:
+    python zeroshot_base_AG_mpra_predict.py \\
+    --input my_mpra_test_set.tsv \\
+            --promoter TCCATTATATACCCTCTAGTGTCGGTTCACGCAATG \\
+            --barcode AGAGACTGAGGCCAC \\
+            --left_adapter CCCGTCCGAACTCCGAACCCCAGAACAGAGCAAAGCCTCCTCGGCCTCCCTGTCCCCAGCCTTCCCCG \\
+            --output_types RNA_SEQ \\
+            --construct_template "{promoter}{left_adapter}{insert}{right_adapter}{barcode}"
 
 NOTE ON SEQUENCE LENGTH
 ------------------------
 By default this script center-pads every construct with 'N' up to
-MIN_SAFE_SEQUENCE_LENGTH (65,536bp) before calling `predict_sequence`.
-This is required: AlphaGenome's pairwise attention machinery needs a
-minimum input length to run at all, and short MPRA inserts (a few hundred
-bp) fed in directly raise a JAX shape-broadcast error. 'N' one-hot encodes
+MIN_SAFE_SEQUENCE_LENGTH (4,096 bp) before calling `predict_sequence`. 'N' one-hot encodes
 to the zero vector (no information), and pooling defaults to
 `--pooling center_window` with an automatic per-sequence window matching
 each row's own original (pre-padding) length -- so the padded flanks are
@@ -232,8 +238,7 @@ def validate_ontology_curies(
     output_types: list[dna_output.OutputType],
     organism: dna_model.Organism,
 ) -> None:
-    """Raises ValueError if any requested CURIE matches zero tracks across
-    all requested output types. A CURIE only needs to match ONE output type
+    """Validates the ontology curies. A CURIE only needs to match ONE output type
     to be valid (e.g. a CAGE-specific curie alongside an RNA_SEQ-specific
     one in the same --ontology_curie list is a legitimate, intentional use)."""
     metadata = model._metadata[organism]  # pylint: disable=protected-access
